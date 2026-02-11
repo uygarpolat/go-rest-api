@@ -1,9 +1,9 @@
 POST http://localhost:8080/events
 Content-Type: application/json
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InRlc3QyQGV4YW1wbGUuY29tIiwiZXhwIjoxNzcwODU0NzMwLCJ1c2VySWQiOjJ9.4Z1PKsvu5o1JIKR3z8C8WS7ZO-snTrwjJvybsRipkK8
+Authorization: # Enter JWT here
 
 {
-	"name": "The latest event that was created",
+	"name": "The latest event that was created. 3",
 	"description": "This is another test event",
 	"location": "Location of test",
 	"dateTime": "2026-01-01T00:00:00.000Z"
