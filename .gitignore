@@ -17,3 +17,5 @@ api.db
 *.db
 *.db-shm
 *.db-wal
+
+.env
