@@ -11,3 +11,9 @@ coverage.out
 
 bin/
 dist/
+
+# SQLite runtime files
+api.db
+*.db
+*.db-shm
+*.db-wal
