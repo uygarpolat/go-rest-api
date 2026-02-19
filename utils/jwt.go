@@ -2,60 +2,72 @@ package utils
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/joho/godotenv"
 )
 
-var jwtSecret []byte
+type tokenClaims struct {
+	Email  string `json:"email"`
+	UserID int64  `json:"userId"`
+	jwt.RegisteredClaims
+}
 
-func init() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
+func getJWTSecret() ([]byte, error) {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return nil, errors.New("JWT_SECRET is not set")
 	}
-	jwtSecret = []byte(os.Getenv("JWT_SECRET"))
+	return []byte(secret), nil
 }
 
 func GenerateToken(email string, userId int64) (string, error) {
-	if len(jwtSecret) == 0 {
-		return "", errors.New("JWT_SECRET is not set")
+	jwtSecret, err := getJWTSecret()
+	if err != nil {
+		return "", err
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"email":  email,
-		"userId": userId,
-		"exp":    time.Now().Add(time.Hour * 2).Unix(),
-	})
-	return token.SignedString(jwtSecret)
+	claims := tokenClaims{
+		Email:  email,
+		UserID: userId,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(2 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString(jwtSecret)
+	if err != nil {
+		return "", fmt.Errorf("sign token: %w", err)
+	}
+	return signedToken, nil
 }
 
-func VerifyToken(token string) (int64, error) {
-	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
-		_, ok := token.Method.(*jwt.SigningMethodHMAC)
-		if !ok {
-			return nil, errors.New("Unexpected signing method")
+func VerifyToken(tokenString string) (int64, error) {
+	jwtSecret, err := getJWTSecret()
+	if err != nil {
+		return 0, err
+	}
+
+	claims := &tokenClaims{}
+	parsedToken, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, fmt.Errorf("unexpected signing method: %s", token.Method.Alg())
 		}
 		return jwtSecret, nil
-	})
-
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil {
-		return 0, errors.New("Could not parse token")
-	}
-	
-	tokenIsValid := parsedToken.Valid
-	if !tokenIsValid {
-		return 0, errors.New("Invalid token")
-	}
-	
-	claims, ok := parsedToken.Claims.(jwt.MapClaims)
-	if !ok {
-		return 0, errors.New("Could not get claims")
+		return 0, fmt.Errorf("parse token: %w", err)
 	}
 
-	// email := claims["email"].(string)
-	userId := int64(claims["userId"].(float64))
+	if !parsedToken.Valid {
+		return 0, errors.New("invalid token")
+	}
 
-	return userId, nil
+	if claims.UserID == 0 {
+		return 0, errors.New("invalid token claims")
+	}
+
+	return claims.UserID, nil
 }
